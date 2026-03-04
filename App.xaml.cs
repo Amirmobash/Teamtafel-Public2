@@ -11,17 +11,6 @@ namespace ManagementApp
 {
     public partial class App : Application
     {
-        private static readonly ILogger<App> Logger = LoggingService.CreateLogger<App>();
-
-
-                mainWindow.Closed += (_, __) =>
-                {
-                    RequestHardShutdown(0);
-                };
-
-                mainWindow.Show();
-                mainWindow.Activate();
-                mainWindow.Focus();
 
                 ApplyFlowDirection();
 
@@ -322,5 +311,6 @@ namespace ManagementApp
         }
     }
 }
+
 
 
