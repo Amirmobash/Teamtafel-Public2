@@ -13,41 +13,6 @@ namespace ManagementApp
     {
         private static readonly ILogger<App> Logger = LoggingService.CreateLogger<App>();
 
-        private static string? _sharedDataDirectory;
-        private static FileSystemWatcher? _languageConfigWatcher;
-        private static readonly object _watcherLock = new object();
-
-        private static int _shutdownRequested;
-
-        internal static string? SharedDataDirectory => _sharedDataDirectory;
-
-        protected override void OnStartup(StartupEventArgs e)
-        {
-            Views.SplashWindow? splash = null;
-
-            try
-            {
-                ShutdownMode = ShutdownMode.OnMainWindowClose;
-
-                SetupGeorgianCulture();
-
-                LoggingService.ConfigureLogging();
-                Logger.LogInformation("Starting Management Application");
-
-                AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-                DispatcherUnhandledException += OnDispatcherUnhandledException;
-
-                LoadLocalizedResources();
-
-                base.OnStartup(e);
-
-                splash = new Views.SplashWindow();
-                splash.Show();
-
-                Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
-                var mainWindow = new Views.MainWindow();
-                MainWindow = mainWindow;
 
                 mainWindow.Closed += (_, __) =>
                 {
@@ -357,4 +322,5 @@ namespace ManagementApp
         }
     }
 }
+
 
