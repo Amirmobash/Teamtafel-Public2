@@ -9,7 +9,7 @@ using Shared.Utils;
 
 namespace ManagementApp
 {
-    public partial class App : System.Windows.Application
+    public partial class App : Application
     {
         private static readonly ILogger<App> Logger = LoggingService.CreateLogger<App>();
 
@@ -17,7 +17,7 @@ namespace ManagementApp
         private static FileSystemWatcher? _languageConfigWatcher;
         private static readonly object _watcherLock = new object();
 
-        private static int _isExiting;
+        private static int _shutdownRequested;
 
         internal static string? SharedDataDirectory => _sharedDataDirectory;
 
@@ -27,76 +27,60 @@ namespace ManagementApp
 
             try
             {
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+
                 SetupGeorgianCulture();
 
                 LoggingService.ConfigureLogging();
                 Logger.LogInformation("Starting Management Application");
-                Logger.LogInformation("Culture setup completed");
-
-                LoadLocalizedResources();
 
                 AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
                 DispatcherUnhandledException += OnDispatcherUnhandledException;
 
+                LoadLocalizedResources();
+
                 base.OnStartup(e);
+
+                splash = new Views.SplashWindow();
+                splash.Show();
+
+                Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+
+                var mainWindow = new Views.MainWindow();
+                MainWindow = mainWindow;
+
+                mainWindow.Closed += (_, __) =>
+                {
+                    RequestHardShutdown(0);
+                };
+
+                mainWindow.Show();
+                mainWindow.Activate();
+                mainWindow.Focus();
 
                 ApplyFlowDirection();
 
                 StartLanguageConfigWatcher();
-                Logger.LogInformation("Localized resources loaded");
-
-                splash = new Views.SplashWindow();
-                splash.Show();
-                Logger.LogInformation("Splash screen shown");
-
-                Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
-                try
-                {
-                    var mainWindow = new Views.MainWindow();
-                    MainWindow = mainWindow;
-                    mainWindow.Show();
-                    mainWindow.Activate();
-                    mainWindow.Focus();
-                    ApplyFlowDirection();
-                    Logger.LogInformation("MainWindow created and shown successfully");
-                }
-                catch (Exception windowEx)
-                {
-                    Logger.LogError(windowEx, "Failed to create or show MainWindow");
-                    var errorMessage = $"Error creating main window:\n\n{windowEx.Message}\n\nDetails:\n{windowEx}";
-                    MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Shutdown(1);
-                    return;
-                }
-                finally
-                {
-                    splash?.Close();
-                }
 
                 Logger.LogInformation("Management Application started successfully");
             }
             catch (Exception ex)
             {
-                try
-                {
-                    splash?.Close();
-                }
-                catch
-                {
-                }
+                try { splash?.Close(); } catch { }
 
-                try
-                {
-                    Logger.LogError(ex, "Failed to start Management Application");
-                }
-                catch
-                {
-                }
+                try { Logger.LogError(ex, "Failed to start Management Application"); } catch { }
 
-                var errorMessage = $"Error starting application:\n\n{ex.Message}\n\nDetails:\n{ex}";
-                MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                Shutdown(1);
+                MessageBox.Show(
+                    $"Error starting application:\n\n{ex.Message}\n\nDetails:\n{ex}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                RequestHardShutdown(1);
+            }
+            finally
+            {
+                try { splash?.Close(); } catch { }
             }
         }
 
@@ -119,39 +103,20 @@ namespace ManagementApp
         {
             try
             {
-                Interlocked.Exchange(ref _isExiting, 1);
+                Logger.LogInformation("Shutting down Management Application");
+            }
+            catch
+            {
+            }
 
-                try
-                {
-                    StopLanguageConfigWatcher();
-                }
-                catch
-                {
-                }
+            try
+            {
+                Interlocked.Exchange(ref _shutdownRequested, 1);
 
-                try
-                {
-                    AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
-                }
-                catch
-                {
-                }
+                try { StopLanguageConfigWatcher(); } catch { }
 
-                try
-                {
-                    DispatcherUnhandledException -= OnDispatcherUnhandledException;
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    Logger.LogInformation("Shutting down Management Application");
-                }
-                catch
-                {
-                }
+                try { AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException; } catch { }
+                try { Current.DispatcherUnhandledException -= OnDispatcherUnhandledException; } catch { }
             }
             catch
             {
@@ -159,6 +124,46 @@ namespace ManagementApp
             finally
             {
                 base.OnExit(e);
+
+                try
+                {
+                    Environment.Exit(e.ApplicationExitCode);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private static void RequestHardShutdown(int exitCode)
+        {
+            if (Interlocked.Exchange(ref _shutdownRequested, 1) == 1)
+                return;
+
+            try { StopLanguageConfigWatcher(); } catch { }
+
+            try { AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException; } catch { }
+
+            try
+            {
+                var app = Current;
+                if (app != null)
+                {
+                    try { app.DispatcherUnhandledException -= ((App)app).OnDispatcherUnhandledException; } catch { }
+
+                    try { app.Shutdown(exitCode); } catch { }
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                Environment.Exit(exitCode);
+            }
+            catch
+            {
             }
         }
 
@@ -187,14 +192,14 @@ namespace ManagementApp
 
         internal static void ApplyFlowDirection()
         {
-            if (Interlocked.CompareExchange(ref _isExiting, 0, 0) == 1)
+            if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1)
                 return;
 
-            var current = Current;
-            if (current == null)
+            var app = Current;
+            if (app == null)
                 return;
 
-            var dispatcher = current.Dispatcher;
+            var dispatcher = app.Dispatcher;
             if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                 return;
 
@@ -203,11 +208,11 @@ namespace ManagementApp
 
             dispatcher.BeginInvoke(new Action(() =>
             {
-                var app = Current;
-                if (app == null)
+                var a = Current;
+                if (a == null)
                     return;
 
-                var mw = app.MainWindow;
+                var mw = a.MainWindow;
                 if (mw != null)
                     mw.FlowDirection = flow;
             }), System.Windows.Threading.DispatcherPriority.Normal);
@@ -215,7 +220,7 @@ namespace ManagementApp
 
         private static void StartLanguageConfigWatcher()
         {
-            if (Interlocked.CompareExchange(ref _isExiting, 0, 0) == 1)
+            if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1)
                 return;
 
             if (string.IsNullOrEmpty(_sharedDataDirectory))
@@ -267,65 +272,17 @@ namespace ManagementApp
                 if (watcher == null)
                     return;
 
-                try
-                {
-                    watcher.EnableRaisingEvents = false;
-                }
-                catch
-                {
-                }
+                try { watcher.EnableRaisingEvents = false; } catch { }
 
-                try
-                {
-                    watcher.Changed -= OnLanguageConfigChanged;
-                }
-                catch
-                {
-                }
+                try { watcher.Changed -= OnLanguageConfigChanged; } catch { }
+                try { watcher.Created -= OnLanguageConfigChanged; } catch { }
+                try { watcher.Deleted -= OnLanguageConfigChanged; } catch { }
+                try { watcher.Renamed -= OnLanguageConfigRenamed; } catch { }
+                try { watcher.Error -= OnLanguageConfigWatcherError; } catch { }
 
-                try
-                {
-                    watcher.Created -= OnLanguageConfigChanged;
-                }
-                catch
-                {
-                }
+                try { watcher.Dispose(); } catch { }
 
-                try
-                {
-                    watcher.Deleted -= OnLanguageConfigChanged;
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    watcher.Renamed -= OnLanguageConfigRenamed;
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    watcher.Error -= OnLanguageConfigWatcherError;
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    watcher.Dispose();
-                }
-                catch
-                {
-                }
-                finally
-                {
-                    _languageConfigWatcher = null;
-                }
+                _languageConfigWatcher = null;
             }
         }
 
@@ -349,7 +306,7 @@ namespace ManagementApp
         {
             try
             {
-                if (Interlocked.CompareExchange(ref _isExiting, 0, 0) == 1)
+                if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1)
                     return;
 
                 if (string.IsNullOrEmpty(_sharedDataDirectory))
@@ -363,17 +320,17 @@ namespace ManagementApp
 
                 ResourceManager.LoadResourcesForLanguage(_sharedDataDirectory, newLang);
 
-                var current = Current;
-                if (current == null)
+                var app = Current;
+                if (app == null)
                     return;
 
-                var dispatcher = current.Dispatcher;
+                var dispatcher = app.Dispatcher;
                 if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                     return;
 
                 dispatcher.BeginInvoke(new Action(() =>
                 {
-                    if (Interlocked.CompareExchange(ref _isExiting, 0, 0) == 1)
+                    if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1)
                         return;
 
                     ResourceBridge.Instance.CurrentLanguage = newLang;
@@ -383,13 +340,7 @@ namespace ManagementApp
             }
             catch (Exception ex)
             {
-                try
-                {
-                    Logger.LogWarning(ex, "Error applying language change from file");
-                }
-                catch
-                {
-                }
+                try { Logger.LogWarning(ex, "Error applying language change from file"); } catch { }
             }
         }
 
