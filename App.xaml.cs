@@ -109,28 +109,6 @@ namespace ManagementApp
             {
             }
 
-            try
-            {
-                Interlocked.Exchange(ref _shutdownRequested, 1);
-
-                try { StopLanguageConfigWatcher(); } catch { }
-
-                try { AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException; } catch { }
-                try { Current.DispatcherUnhandledException -= OnDispatcherUnhandledException; } catch { }
-            }
-            catch
-            {
-            }
-            finally
-            {
-                base.OnExit(e);
-
-                try
-                {
-                    Environment.Exit(e.ApplicationExitCode);
-                }
-                catch
-                {
                 }
             }
         }
@@ -379,3 +357,4 @@ namespace ManagementApp
         }
     }
 }
+
