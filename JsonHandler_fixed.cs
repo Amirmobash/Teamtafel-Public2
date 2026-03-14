@@ -42,38 +42,6 @@ namespace Shared.Services
         }
 
         public string GetTodayFilepath()
-        {
-            return Path.Combine(_reportsDir, GetTodayFilename());
-        }
-
-
-        public string? GetLatestReportFilepath()
-        {
-            try
-            {
-                if (!Directory.Exists(_reportsDir))
-                    return null;
-
-                var latest = Directory.GetFiles(_reportsDir, "report_*.json", SearchOption.TopDirectoryOnly)
-                    .Where(f => !Path.GetFileName(f).Contains("_backup_", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .FirstOrDefault();
-
-                return latest;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error finding latest report file");
-                return null;
-            }
-        }
-
-        public Dictionary<string, object>? ReadLatestReport()
-        {
-            var path = GetLatestReportFilepath();
-            if (string.IsNullOrWhiteSpace(path))
-                return null;
-
             return ReadJson(path);
         }
 
@@ -327,16 +295,6 @@ namespace Shared.Services
                     }
                 }
 
-                if (csvPath == null)
-                {
-                    _logger.LogWarning("Sample employees CSV not found. Tried paths: {Paths}", 
-                        string.Join(", ", possiblePaths));
-                    return new List<object>();
-                }
-
-                _logger.LogInformation("Loading sample employees from {CsvPath}", csvPath);
-
-                var employees = new List<object>();
                 var lines = File.ReadAllLines(csvPath, System.Text.Encoding.UTF8);
                 
                 if (lines.Length < 2) // Need at least header + one data row
@@ -450,15 +408,6 @@ namespace Shared.Services
                             {
                                 data["tasks"] = prevTasks;
                                 _logger.LogInformation("Carried forward tasks from previous day");
-                            }
-                            
-                            var settings = data.GetValueOrDefault("settings", new Dictionary<string, object>()) as Dictionary<string, object>;
-                            var prevSettings = previousData.GetValueOrDefault("settings", new Dictionary<string, object>()) as Dictionary<string, object>;
-                            if (settings != null && prevSettings != null)
-                            {
-                                settings["managers"] = prevSettings.GetValueOrDefault("managers", new List<object>());
-                            }
-                            
                             WriteJson(filepath, data);
                             _logger.LogInformation("Carried forward employees and tasks from previous day");
                             return data;
