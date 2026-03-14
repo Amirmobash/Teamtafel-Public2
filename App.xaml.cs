@@ -14,11 +14,6 @@ namespace ManagementApp
 
                 ApplyFlowDirection();
 
-                StartLanguageConfigWatcher();
-
-                Logger.LogInformation("Management Application started successfully");
-            }
-            catch (Exception ex)
             {
                 try { splash?.Close(); } catch { }
 
@@ -61,14 +56,6 @@ namespace ManagementApp
             }
             catch
             {
-            }
-
-                }
-            }
-        }
-
-        private static void RequestHardShutdown(int exitCode)
-        {
             if (Interlocked.Exchange(ref _shutdownRequested, 1) == 1)
                 return;
 
@@ -152,19 +139,7 @@ namespace ManagementApp
 
         private static void StartLanguageConfigWatcher()
         {
-            if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1)
-                return;
-
-            if (string.IsNullOrEmpty(_sharedDataDirectory))
-                return;
-
-            var configPath = LanguageConfigHelper.GetLanguageConfigPath(_sharedDataDirectory);
-            if (string.IsNullOrEmpty(configPath))
-                return;
-
-            var configDir = Path.GetDirectoryName(configPath);
-            var configFileName = Path.GetFileName(configPath);
-            if (string.IsNullOrEmpty(configDir) || string.IsNullOrEmpty(configFileName))
+            if (Interlocked.CompareExchange(ref _shutdownRequested, 0, 0) == 1) (string.IsNullOrEmpty(configDir) || string.IsNullOrEmpty(configFileName))
                 return;
 
             try
@@ -218,17 +193,6 @@ namespace ManagementApp
             }
         }
 
-        private static void OnLanguageConfigRenamed(object sender, RenamedEventArgs e)
-        {
-            OnLanguageConfigChanged(sender, e);
-        }
-
-        private static void OnLanguageConfigWatcherError(object sender, ErrorEventArgs e)
-        {
-            try
-            {
-                Logger.LogWarning(e.GetException(), "Language config watcher error");
-            }
             catch
             {
             }
@@ -251,11 +215,6 @@ namespace ManagementApp
                     return;
 
                 ResourceManager.LoadResourcesForLanguage(_sharedDataDirectory, newLang);
-
-                var app = Current;
-                if (app == null)
-                    return;
-
                 var dispatcher = app.Dispatcher;
                 if (dispatcher == null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
                     return;
