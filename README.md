@@ -2,7 +2,7 @@
 
 **Teamtafel** is a WPF-based workforce management dashboard for shift planning, absence tracking, task management, and report generation — designed for clarity, speed, and shared-folder workflows.
 
-**Author:** Amir Mobasheraghdam (Amir Mobasheraghdam)
+**Author:** Amir Mobasheraghdam (AmirMobash)
 
 ---
 
