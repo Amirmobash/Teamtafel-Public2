@@ -16,17 +16,6 @@ namespace ManagementApp.Controllers
 {
     public enum ConflictType
     {
-        None,
-        Absent,              // Employee is absent/sick/on leave
-        DifferentShift,      // Employee assigned to different shift in same group
-        DifferentGroup       // Employee assigned to different group
-    }
-
-    public class AssignmentConflict
-    {
-        public ConflictType Type { get; set; }
-        public string? CurrentGroupId { get; set; }
-        public string? CurrentGroupName { get; set; }
         public string? CurrentShiftType { get; set; }
         public string? AbsenceType { get; set; } // "Absent", "Sick", "Leave"
     }
