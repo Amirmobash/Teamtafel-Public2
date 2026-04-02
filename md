@@ -26,15 +26,6 @@ namespace ManagementApp.Controllers
         public AssignmentConflict? Conflict { get; set; }
         public string? ErrorMessage { get; set; }
     }
-
-    public class MainController
-    {
-        private string _dataDir;
-        private JsonHandler _jsonHandler;
-        private SyncManager _syncManager;
-        private readonly ILogger<MainController> _logger;
-        private DateTime _lastCapacityChange = DateTime.MinValue;
-        private System.Threading.Timer? _rotationTimer;
         private DateTime _lastRotationCheck = DateTime.MinValue;
         private BadgeGeneratorService _badgeGenerator;
         private FileSystemWatcher? _imageWatcher;
